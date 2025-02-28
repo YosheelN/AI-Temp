@@ -7,17 +7,18 @@
 // Structure to hold quiz questions and answers
 struct Question {
     std::string question;
-    std::string answer;
+    std::vector<std::string> options;
+    int correctOption; // Index of the correct option
 };
 
 // Function to initialize quiz questions
 std::vector<Question> initializeQuestions() {
     return {
-        {"What is the capital of France?", "Paris"},
-        {"What is 2 + 2?", "4"},
-        {"What is the largest planet in the solar system?", "Jupiter"},
-        {"What is the chemical symbol for water?", "H2O"},
-        {"Who wrote 'Romeo and Juliet'?", "Shakespeare"}
+        {"What is the capital of France?", {"London", "Paris", "Berlin", "Madrid"}, 1},
+        {"What is 2 + 2?", {"3", "4", "5", "6"}, 1},
+        {"What is the largest planet in the solar system?", {"Earth", "Mars", "Jupiter", "Saturn"}, 2},
+        {"What is the chemical symbol for water?", {"CO2", "H2O", "O2", "NaCl"}, 1},
+        {"Who wrote 'Romeo and Juliet'?", {"Shakespeare", "Hemingway", "Tolstoy", "Dickens"}, 0}
     };
 }
 
@@ -50,17 +51,50 @@ int main() {
     questionText.setFillColor(sf::Color::White);
     questionText.setPosition(50, 50);
 
-    sf::Text inputText;
-    inputText.setFont(font);
-    inputText.setCharacterSize(24);
-    inputText.setFillColor(sf::Color::White);
-    inputText.setPosition(50, 150);
+    // Health bar properties
+    const int healthBarWidth = 200;
+    const int healthBarHeight = 20;
+    const int healthBarSpacing = 40;
 
-    sf::Text healthText;
-    healthText.setFont(font);
-    healthText.setCharacterSize(24);
-    healthText.setFillColor(sf::Color::White);
-    healthText.setPosition(50, 400);
+    sf::RectangleShape userHealthBar(sf::Vector2f(healthBarWidth, healthBarHeight));
+    userHealthBar.setFillColor(sf::Color::Green);
+    userHealthBar.setPosition(50, 400);
+
+    sf::RectangleShape aiHealthBar(sf::Vector2f(healthBarWidth, healthBarHeight));
+    aiHealthBar.setFillColor(sf::Color::Green);
+    aiHealthBar.setPosition(50, 400 + healthBarSpacing);
+
+    // Health bar backgrounds
+    sf::RectangleShape userHealthBarBackground(sf::Vector2f(healthBarWidth, healthBarHeight));
+    userHealthBarBackground.setFillColor(sf::Color::Red);
+    userHealthBarBackground.setPosition(50, 400);
+
+    sf::RectangleShape aiHealthBarBackground(sf::Vector2f(healthBarWidth, healthBarHeight));
+    aiHealthBarBackground.setFillColor(sf::Color::Red);
+    aiHealthBarBackground.setPosition(50, 400 + healthBarSpacing);
+
+    // Button properties
+    const int buttonWidth = 200;
+    const int buttonHeight = 50;
+    const int buttonSpacing = 20;
+    const int buttonStartY = 150;
+
+    std::vector<sf::RectangleShape> buttons;
+    std::vector<sf::Text> buttonLabels;
+
+    for (int i = 0; i < 4; ++i) {
+        sf::RectangleShape button(sf::Vector2f(buttonWidth, buttonHeight));
+        button.setPosition(50, buttonStartY + i * (buttonHeight + buttonSpacing));
+        button.setFillColor(sf::Color::Blue);
+        buttons.push_back(button);
+
+        sf::Text label;
+        label.setFont(font);
+        label.setCharacterSize(20);
+        label.setFillColor(sf::Color::White);
+        label.setPosition(60, buttonStartY + i * (buttonHeight + buttonSpacing) + 10);
+        buttonLabels.push_back(label);
+    }
 
     // Main game loop
     while (window.isOpen() && userHealth > 0 && aiHealth > 0) {
@@ -69,58 +103,65 @@ int main() {
             if (event.type == sf::Event::Closed)
                 window.close();
 
-            // Handle text input
-            if (event.type == sf::Event::TextEntered) {
-                if (event.text.unicode == '\b' && !inputText.getString().isEmpty()) {
-                    // Backspace: remove last character
-                    std::string currentText = inputText.getString();
-                    currentText.pop_back();
-                    inputText.setString(currentText);
-                } else if (event.text.unicode < 128) {
-                    // Append character to input
-                    inputText.setString(inputText.getString() + static_cast<char>(event.text.unicode));
+            // Handle mouse clicks
+            if (event.type == sf::Event::MouseButtonPressed) {
+                if (event.mouseButton.button == sf::Mouse::Left) {
+                    sf::Vector2f mousePos = window.mapPixelToCoords(sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
+
+                    // Check which button was clicked
+                    for (size_t i = 0; i < buttons.size(); ++i) {
+                        if (buttons[i].getGlobalBounds().contains(mousePos)) {
+                            // Check if the answer is correct
+                            if (i == questions[currentQuestionIndex].correctOption) {
+                                aiHealth -= 10; // AI loses health
+                            } else {
+                                userHealth -= 10; // User loses health
+                            }
+
+                            // AI's turn (randomly correct or incorrect)
+                            bool aiCorrect = (rand() % 2 == 0);
+                            if (aiCorrect) {
+                                userHealth -= 10; // User loses health
+                            } else {
+                                aiHealth -= 10; // AI loses health
+                            }
+
+                            // Move to the next question
+                            currentQuestionIndex = (currentQuestionIndex + 1) % questions.size();
+                            break;
+                        }
+                    }
                 }
-            }
-
-            // Handle Enter key (submit answer)
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Enter) {
-                std::string userAnswer = inputText.getString();
-                std::string correctAnswer = questions[currentQuestionIndex].answer;
-
-                // Check if answer is correct
-                if (userAnswer == correctAnswer) {
-                    aiHealth -= 10; // AI loses health
-                } else {
-                    userHealth -= 10; // User loses health
-                }
-
-                // AI's turn (randomly correct or incorrect)
-                bool aiCorrect = (rand() % 2 == 0);
-                if (aiCorrect) {
-                    userHealth -= 10; // User loses health
-                } else {
-                    aiHealth -= 10; // AI loses health
-                }
-
-                // Move to the next question
-                currentQuestionIndex = (currentQuestionIndex + 1) % questions.size();
-                inputText.setString(""); // Clear input
             }
         }
 
         // Update question text
         questionText.setString("Question: " + questions[currentQuestionIndex].question);
 
-        // Update health text
-        healthText.setString("Your Health: " + std::to_string(userHealth) + "\nAI Health: " + std::to_string(aiHealth));
+        // Update button labels
+        for (size_t i = 0; i < buttonLabels.size(); ++i) {
+            buttonLabels[i].setString(questions[currentQuestionIndex].options[i]);
+        }
+
+        // Update health bars
+        userHealthBar.setSize(sf::Vector2f(healthBarWidth * (userHealth / 100.0f), healthBarHeight));
+        aiHealthBar.setSize(sf::Vector2f(healthBarWidth * (aiHealth / 100.0f), healthBarHeight));
 
         // Clear the window
         window.clear();
 
         // Draw everything
         window.draw(questionText);
-        window.draw(inputText);
-        window.draw(healthText);
+        window.draw(userHealthBarBackground);
+        window.draw(aiHealthBarBackground);
+        window.draw(userHealthBar);
+        window.draw(aiHealthBar);
+        for (const auto& button : buttons) {
+            window.draw(button);
+        }
+        for (const auto& label : buttonLabels) {
+            window.draw(label);
+        }
 
         // Display the window
         window.display();
